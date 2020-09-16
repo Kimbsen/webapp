@@ -25,6 +25,7 @@ const (
 	ClosableWindowMask
 	MinimizableWindowMask
 	ResizableWindowMask
+	ToolDialogWindowMask // a detached window. On windows this window is not in the taskbar
 	BorderlessWindowMask = 0
 	StdWindowMask        = TitledWindowMask | ClosableWindowMask | MinimizableWindowMask | ResizableWindowMask
 )
@@ -71,6 +72,46 @@ func KeyWindow() *Window {
 // foreground.
 func AllWindowsToFront() {
 	driver.BringAllWindowsToFront()
+}
+
+type WindowOptions struct {
+	Style  StyleMask
+	Bounds geom.Rect
+
+	Title           string
+	Url             string
+	Client          *cef.Client
+	BrowserSettings *cef.BrowserSettings
+}
+
+// NewWindow creates a new window with a webview as its content.
+// Options are an alternate way of passing arguments and allows a
+// *cef.Client and/or *cef.BrowserSettings to be passed as well
+func NewWindowWithOpts(opts WindowOptions) (*Window, error) {
+	window := &Window{
+		style:             opts.Style,
+		title:             opts.Title,
+		MayCloseCallback:  func() bool { return true },
+		WillCloseCallback: func() {},
+		GainedFocus:       func() {},
+		LostFocus:         func() {},
+	}
+	if err := driver.WindowInit(window, opts.Style, opts.Bounds, opts.Title); err != nil {
+		return nil, err
+	}
+
+	opts.Bounds.Size = window.WindowContentSize()
+	opts.Bounds.X = 0
+	opts.Bounds.Y = 0
+	if opts.Client == nil {
+		opts.Client = newClient()
+	}
+	if opts.BrowserSettings == nil {
+		opts.BrowserSettings = cef.NewBrowserSettings()
+	}
+	window.Browser = cef.BrowserHostCreateBrowserSync(cef.NewWindowInfo(driver.WindowBrowserParent(window), opts.Bounds), opts.Client, opts.Url, opts.BrowserSettings, nil, nil)
+	windowList = append(windowList, window)
+	return window, nil
 }
 
 // NewWindow creates a new window with a webview as its content.

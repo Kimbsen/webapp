@@ -105,7 +105,18 @@ func (d *driver) BringAllWindowsToFront() {
 }
 
 func (d *driver) WindowInit(wnd *webapp.Window, style webapp.StyleMask, bounds geom.Rect, title string) error {
-	w := win32.CreateWindowExS(0, windowClassName, title, win32.WS_OVERLAPPEDWINDOW|win32.WS_CLIPCHILDREN, int32(bounds.X), int32(bounds.Y), int32(bounds.Width), int32(bounds.Height), win32.NULL, win32.NULL, d.instance, win32.NULL)
+	const (
+		// https://docs.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+		// setting WS_EX_TOOLWINDOW means it is not displayed in the windows taskbar
+		WS_EX_TOOLWINDOW = 0x00000080
+	)
+
+	var exStyle win32.DWORD
+	if style&webapp.ToolDialogWindowMask == webapp.ToolDialogWindowMask {
+		exStyle |= WS_EX_TOOLWINDOW
+	}
+
+	w := win32.CreateWindowExS(exStyle, windowClassName, title, win32.WS_OVERLAPPEDWINDOW|win32.WS_CLIPCHILDREN, int32(bounds.X), int32(bounds.Y), int32(bounds.Width), int32(bounds.Height), win32.NULL, win32.NULL, d.instance, win32.NULL)
 	if w == win32.NULL {
 		return errs.New("unable to create window")
 	}
